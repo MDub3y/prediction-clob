@@ -1,10 +1,11 @@
 use anchor_lang::prelude::*;
+use std::collections::BTreeMap;
 use crate::quantities::*;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum OrderSide { Buy, Sell }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum OrderStatus { Open, Filled, PartiallyFilled, Cancelled }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -19,15 +20,13 @@ pub struct Order {
     pub status: OrderStatus,
 }
 
+#[account]
 pub struct Orderbook {
-  pub market: Pubkey,
-  pub outcome_mint: Pubkey,
-  pub collateral_mint: Pubkey,
-  pub bids: BTreeMap<Ticks, Vec<Order>>, 
-  pub asks: BTreeMap<Ticks, Vec<Order>>,
-  pub last_order_id: u64,
-}
-
-impl Orderbook {
-    pub const MAX_ORDERS_PER_SIDE: usize = 50; 
+    pub market: Pubkey,
+    pub outcome_mint: Pubkey,
+    pub collateral_mint: Pubkey,
+    pub bids: BTreeMap<Ticks, Vec<Order>>,
+    pub asks: BTreeMap<Ticks, Vec<Order>>, 
+    pub last_order_id: u64,
+    pub bump: u8,
 }
