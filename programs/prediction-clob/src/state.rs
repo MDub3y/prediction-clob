@@ -15,12 +15,16 @@ impl OrderSide {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
-pub enum OrderStatus {
-    Open = 0,
-    Filled = 1,
-    PartiallyFilled = 2,
-    Cancelled = 3,
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+pub struct OrderStatus {
+    pub val: u8,
+}
+
+impl OrderStatus {
+    pub const OPEN: Self = Self { val: 0 };
+    pub const FILLED: Self = Self { val: 1 };
+    pub const PARTIALLY_FILLED: Self = Self { val: 2 };
+    pub const CANCELLED: Self = Self { val: 3 };
 }
 
 #[repr(C)]
