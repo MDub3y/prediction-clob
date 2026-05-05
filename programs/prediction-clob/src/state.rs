@@ -7,11 +7,13 @@ pub const SENTINEL: u32 = u32::MAX;
 
 #[zero_copy]
 #[derive(Debug, PartialEq, Eq)]
-pub struct OrderSide(pub u8);
+pub struct OrderSide {
+    pub val: u8,
+}
 
 impl OrderSide {
-    pub const BID: Self = Self(0);
-    pub const ASK: Self = Self(1);
+    pub const BID: Self = Self { val: 0 };
+    pub const ASK: Self = Self { val: 1 };
 }
 
 #[zero_copy]
