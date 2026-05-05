@@ -5,18 +5,20 @@ use bytemuck::{Pod, Zeroable};
 pub const MAX_ORDERS: usize = 1000;
 pub const SENTINEL: u32 = u32::MAX;
 
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq, InitSpace)]
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
 pub enum OrderSide {
-    Buy,
-    Sell,
+    Buy = 0,
+    Sell = 1,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq, InitSpace)]
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
 pub enum OrderStatus {
-    Open,
-    Filled,
-    PartiallyFilled,
-    Cancelled,
+    Open = 0,
+    Filled = 1,
+    PartiallyFilled = 2,
+    Cancelled = 3,
 }
 
 #[repr(C)]
