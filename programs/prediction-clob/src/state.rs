@@ -43,13 +43,6 @@ pub struct OrderNode {
     pub prev: u32,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq, InitSpace)]
-pub struct PriceLevel {
-    pub price: Ticks,
-    #[max_len(10)]
-    pub orders: Vec<Order>,
-}
-
 #[account(zero_copy)]
 #[repr(C)]
 pub struct Orderbook {

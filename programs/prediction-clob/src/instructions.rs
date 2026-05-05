@@ -1,6 +1,6 @@
-use anchor_lang::prelude::*;
-use anchor_spl::token::{Token, TokenAccount, Mint};
 use crate::state::*;
+use anchor_lang::prelude::*;
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[derive(Accounts)]
 #[instruction(market: Market)]
@@ -8,11 +8,11 @@ pub struct InitializeOrderbook<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + Orderbook::INIT_SPACE,
+        space = 8 + std::mem::size_of::<Orderbook>(),
         seeds = [b"orderbook", market.key().as_ref(), outcome_mint.key().as_ref()],
         bump
     )]
-    pub orderbook: Account<'info, Orderbook>,
+    pub orderbook: AccountLoader<'info, Orderbook>,
 
     pub market: Account<'info, Market>,
     pub outcome_mint: Account<'info, Mint>,
