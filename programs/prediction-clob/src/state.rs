@@ -2,7 +2,7 @@ use crate::quantities::*;
 use anchor_lang::prelude::*;
 use bytemuck::{Pod, Zeroable};
 
-pub const MAX_ORDERS: usize = 1000;
+pub const MAX_ORDERS: usize = 1024;
 pub const SENTINEL: u32 = u32::MAX;
 
 #[repr(transparent)]
