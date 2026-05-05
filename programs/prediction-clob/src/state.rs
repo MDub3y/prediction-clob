@@ -1,13 +1,26 @@
-use anchor_lang::prelude::*;
 use crate::quantities::*;
+use anchor_lang::prelude::*;
+use bytemuck::{Pod, Zeroable};
+
+pub const MAX_ORDERS: usize = 1000;
+pub const SENTINEL: u32 = u32::MAX;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq, InitSpace)]
-pub enum OrderSide { Buy, Sell }
+pub enum OrderSide {
+    Buy,
+    Sell,
+}
 
 #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone, Copy, PartialEq, Eq, InitSpace)]
-pub enum OrderStatus { Open, Filled, PartiallyFilled, Cancelled }
+pub enum OrderStatus {
+    Open,
+    Filled,
+    PartiallyFilled,
+    Cancelled,
+}
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq, InitSpace)]
+#[repr(C)]
+#[derive(Clone, Debug, PartialEq, Eq, InitSpace, Pod, Zeroable)]
 pub struct Order {
     pub user: Pubkey,
     pub order_id: u64,
@@ -32,12 +45,12 @@ pub struct Orderbook {
     pub market: Pubkey,
     pub outcome_mint: Pubkey,
     pub collateral_mint: Pubkey,
-    
+
     #[max_len(50)]
-    pub bids: Vec<PriceLevel>, 
+    pub bids: Vec<PriceLevel>,
     #[max_len(50)]
     pub asks: Vec<PriceLevel>,
-    
+
     pub last_order_id: u64,
     pub bump: u8,
 }
@@ -55,5 +68,5 @@ pub struct Market {
     pub is_settled: bool,
     pub winning_outcome: Option<u8>,
     pub total_collateral_locked: u64,
-    pub bump: u8
+    pub bump: u8,
 }
