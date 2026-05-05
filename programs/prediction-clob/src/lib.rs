@@ -33,6 +33,7 @@ pub mod prediction_clob {
             } else {
                 (i + 1) as u32
             };
+            ob.orders[i].prev = SENTINEL;
             ob.orders[i].status = OrderStatus::CANCELLED;
         }
 

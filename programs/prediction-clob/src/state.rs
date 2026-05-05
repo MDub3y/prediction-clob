@@ -5,8 +5,8 @@ use bytemuck::{Pod, Zeroable};
 pub const MAX_ORDERS: usize = 1024;
 pub const SENTINEL: u32 = u32::MAX;
 
-#[repr(transparent)]
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+#[zero_copy]
+#[derive(Debug, PartialEq, Eq)]
 pub struct OrderSide(pub u8);
 
 impl OrderSide {
@@ -14,8 +14,8 @@ impl OrderSide {
     pub const ASK: Self = Self(1);
 }
 
-#[repr(transparent)]
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+#[zero_copy]
+#[derive(Debug, PartialEq, Eq)]
 pub struct OrderStatus {
     pub val: u8,
 }
@@ -27,8 +27,8 @@ impl OrderStatus {
     pub const CANCELLED: Self = Self { val: 3 };
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
+#[zero_copy]
+#[derive(Debug, PartialEq)]
 pub struct OrderNode {
     pub user: Pubkey,
     pub order_id: u64,
@@ -44,12 +44,10 @@ pub struct OrderNode {
 }
 
 #[account(zero_copy)]
-#[repr(C)]
 pub struct Orderbook {
     pub market: Pubkey,
     pub outcome_mint: Pubkey,
     pub collateral_mint: Pubkey,
-    // Instead of Vec<PriceLevel>, we store the starting indices
     pub bid_head: u32,
     pub ask_head: u32,
     pub free_head: u32,

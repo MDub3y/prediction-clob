@@ -2,16 +2,20 @@ use anchor_lang::prelude::*;
 use bytemuck::{Pod, Zeroable};
 
 // smallest unit of price movement
-#[repr(C)]
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Pod, Zeroable)]
-pub struct Ticks(pub u64);
+#[zero_copy]
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Ticks {
+    pub val: u64,
+}
 
-// smallest unit of outcome token
-#[repr(C)]
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
-pub struct BaseLots(pub u64);
+#[zero_copy]
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct BaseLots {
+    pub val: u64,
+}
 
-// smallest unit of collateral
-#[repr(C)]
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Pod, Zeroable)]
-pub struct QuoteLots(pub u64);
+#[zero_copy]
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct QuoteLots {
+    pub val: u64,
+}
