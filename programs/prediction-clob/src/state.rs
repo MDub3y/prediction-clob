@@ -5,14 +5,16 @@ use bytemuck::{Pod, Zeroable};
 pub const MAX_ORDERS: usize = 1000;
 pub const SENTINEL: u32 = u32::MAX;
 
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
-pub enum OrderSide {
-    Buy = 0,
-    Sell = 1,
+#[repr(transparent)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+pub struct OrderSide(pub u8);
+
+impl OrderSide {
+    pub const BID: Self = Self(0);
+    pub const ASK: Self = Self(1);
 }
 
-#[repr(u8)]
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
 pub enum OrderStatus {
     Open = 0,
