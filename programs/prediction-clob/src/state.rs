@@ -28,8 +28,8 @@ impl OrderStatus {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, PartialEq, Eq, InitSpace, Pod, Zeroable)]
-pub struct Order {
+#[derive(Clone, Copy, Debug, PartialEq, Pod, Zeroable)]
+pub struct OrderNode {
     pub user: Pubkey,
     pub order_id: u64,
     pub price: Ticks,
@@ -38,6 +38,9 @@ pub struct Order {
     pub timestamp: i64,
     pub side: OrderSide,
     pub status: OrderStatus,
+    pub padding: [u8; 6],
+    pub next: u32,
+    pub prev: u32,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq, InitSpace)]
@@ -47,20 +50,21 @@ pub struct PriceLevel {
     pub orders: Vec<Order>,
 }
 
-#[account]
-#[derive(InitSpace)]
+#[account(zero_copy)]
+#[repr(C)]
 pub struct Orderbook {
     pub market: Pubkey,
     pub outcome_mint: Pubkey,
     pub collateral_mint: Pubkey,
-
-    #[max_len(50)]
-    pub bids: Vec<PriceLevel>,
-    #[max_len(50)]
-    pub asks: Vec<PriceLevel>,
-
+    // Instead of Vec<PriceLevel>, we store the starting indices
+    pub bid_head: u32,
+    pub ask_head: u32,
+    pub free_head: u32,
+    pub active_orders: u32,
     pub last_order_id: u64,
     pub bump: u8,
+    pub _padding: [u8; 7],
+    pub orders: [OrderNode; MAX_ORDERS],
 }
 
 #[account]
