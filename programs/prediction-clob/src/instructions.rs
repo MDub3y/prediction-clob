@@ -1,6 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token, TokenAccount};
+use anchor_spl::token::Mint;
 
 #[derive(Accounts)]
 #[instruction(market: Market)]
@@ -14,7 +14,12 @@ pub struct InitializeOrderbook<'info> {
     )]
     pub orderbook: AccountLoader<'info, Orderbook>,
 
+    #[account(mut)]
     pub market: Account<'info, Market>,
+
+    #[account(
+        constraint = outcome_mint.key() == market.outcome_a_mint || outcome_mint.key() == market.outcome_b_mint
+    )]
     pub outcome_mint: Account<'info, Mint>,
 
     #[account(mut)]
