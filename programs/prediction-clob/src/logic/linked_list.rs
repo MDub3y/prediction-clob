@@ -1,4 +1,3 @@
-use crate::quantities::*;
 use crate::state::*;
 
 pub fn pop_free_node(ob: &mut Orderbook) -> Option<u32> {
@@ -46,7 +45,7 @@ pub fn insert_sorted(ob: &mut Orderbook, new_index: u32, side: OrderSide) {
         curr_idx = curr_node.next;
     }
 
-    ob.orders[new_index as usize].next = current_idx;
+    ob.orders[new_index as usize].next = curr_idx;
     ob.orders[new_index as usize].prev = prev_idx;
 
     if prev_idx == SENTINEL {
@@ -59,7 +58,7 @@ pub fn insert_sorted(ob: &mut Orderbook, new_index: u32, side: OrderSide) {
         ob.orders[prev_idx as usize].next = new_index;
     }
 
-    if current_idx != SENTINEL {
-        ob.orders[current_idx as usize].prev = new_index;
+    if curr_idx != SENTINEL {
+        ob.orders[curr_idx as usize].prev = new_index;
     }
 }

@@ -1,5 +1,5 @@
-use crate::logic::linked_list::*;
-use crate::logic::matching::*;
+use crate::logic::*;
+use crate::quantities::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
@@ -13,7 +13,7 @@ pub struct PlaceOrder<'info> {
     pub market: Account<'info, Market>,
 
     #[account(mut)]
-    pub signer: Signer<'info>,
+    pub user: Signer<'info>,
 
     #[account(
         mut,
@@ -46,7 +46,7 @@ pub fn handle_place_order(
     // pre-transfer of funds to vault
     // for BID: taker sends base asset (quantity * price)
     // for ASK: taker sends outcome token (quantity)
-    let deposit_amount = if taker_side == OrderSide::Bid {
+    let deposit_amount = if taker_side == OrderSide::BID {
         quantity.checked_mul(price).ok_or(ErrorCode::MathOverflow)?
     } else {
         quantity
@@ -56,8 +56,8 @@ pub fn handle_place_order(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
-                from: ctx.accoutns.user_token_account.to_account_info(),
-                to: ctx.accounts.merket_vault.to_account_info(),
+                from: ctx.accounts.user_token_account.to_account_info(),
+                to: ctx.accounts.market_vault.to_account_info(),
                 authority: ctx.accounts.user.to_account_info(),
             },
         ),
