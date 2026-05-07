@@ -107,4 +107,6 @@ pub enum ErrorCode {
     SlippageExceeded,
     #[msg("Math overflow.")]
     MathOverflow,
+    #[msg("No funds available to claim.")]
+    NothingToClaim,
 }
