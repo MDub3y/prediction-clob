@@ -1,3 +1,5 @@
+use anchor_lang::solana_program::pubkey::Pubkey;
+
 use crate::logic::linked_list::*;
 use crate::state::*;
 
@@ -5,6 +7,13 @@ pub struct MatchResult {
     pub base_filled: u64,
     pub quote_filled: u64,
     pub remaining_quantity: u64,
+    pub makers_to_settle: Vec<FilledMaker>,
+}
+
+pub struct FilledMaker {
+    pub user: Pubkey,
+    pub base_delta: u64,
+    pub quote_delta: u64,
 }
 
 pub fn execute_match(
@@ -16,6 +25,7 @@ pub fn execute_match(
     let mut remaining = taker_quantity;
     let mut total_quote = 0u64;
     let mut total_base = 0u64;
+    let mut makers = Vec::new();
 
     let mut maker_idx = if taker_side == OrderSide::BID {
         ob.ask_head
@@ -24,54 +34,50 @@ pub fn execute_match(
     };
 
     while maker_idx != SENTINEL && remaining > 0 {
-        let maker_node = &mut ob.orders[maker_idx as usize];
+        let (maker_user, maker_price, fill_amt, is_full_fill) = {
+            let maker_node = &mut ob.orders[maker_idx as usize];
 
-        let price_ok = if taker_side == OrderSide::BID {
-            maker_node.price.val <= limit_price
-        } else {
-            maker_node.price.val >= limit_price
+            let price_ok = if taker_side == OrderSide::BID {
+                maker_node.price.val <= limit_price
+            } else {
+                maker_node.price.val >= limit_price
+            };
+            if !price_ok {
+                break;
+            }
+
+            let available = maker_node.quantity.val - maker_node.filled_quantity.val;
+            let fill = std::cmp::min(remaining, available);
+
+            maker_node.filled_quantity.val += fill;
+            let full = maker_node.filled_quantity.val == maker_node.quantity.val;
+
+            (maker_node.user, maker_node.price.val, fill, full)
         };
 
-        if !price_ok {
-            break;
-        }
-
-        let maker_available = maker_node.quantity.val - maker_node.filled_quantity.val;
-        let fill_amt = std::cmp::min(remaining, maker_available);
-
-        maker_node.filled_quantity.val += fill_amt;
         remaining -= fill_amt;
         total_base += fill_amt;
-        total_quote += fill_amt * maker_node.price.val;
+        total_quote += fill_amt * maker_price;
 
-        let next_maker = maker_node.next;
+        makers.push(FilledMaker {
+            user: maker_user,
+            base_delta: fill_amt,
+            quote_delta: fill_amt * maker_price,
+        });
 
-        if maker_node.filled_quantity.val == maker_node.quantity.val {
-            maker_node.status = OrderStatus::FILLED;
-            let p = maker_node.prev;
-            let n = maker_node.next;
-            if p != SENTINEL {
-                ob.orders[p as usize].next = n;
-            } else {
-                if taker_side == OrderSide::BID {
-                    ob.ask_head = n;
-                } else {
-                    ob.bid_head = n;
-                }
-            }
-            if n != SENTINEL {
-                ob.orders[n as usize].prev = p;
-            }
-
-            push_free_node(ob, maker_idx);
+        if is_full_fill {
+            let next_ptr = ob.orders[maker_idx as usize].next;
+            unstitch_and_free(ob, maker_idx, taker_side.opposite());
+            maker_idx = next_ptr;
+        } else {
+            break;
         }
-
-        maker_idx = next_maker;
     }
 
     MatchResult {
         base_filled: total_base,
         quote_filled: total_quote,
         remaining_quantity: remaining,
+        makers_to_settle: makers,
     }
 }

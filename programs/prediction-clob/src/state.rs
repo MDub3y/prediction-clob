@@ -13,6 +13,14 @@ pub struct OrderSide {
 impl OrderSide {
     pub const BID: Self = Self { val: 0 };
     pub const ASK: Self = Self { val: 1 };
+
+    pub fn opposite(&self) -> Self {
+        if *self == Self::BID {
+            Self::ASK
+        } else {
+            Self::BID
+        }
+    }
 }
 
 #[zero_copy]

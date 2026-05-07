@@ -62,3 +62,24 @@ pub fn insert_sorted(ob: &mut Orderbook, new_index: u32, side: OrderSide) {
         ob.orders[curr_idx as usize].prev = new_index;
     }
 }
+
+pub fn unstitch_and_free(ob: &mut Orderbook, index: u32, side: OrderSide) {
+    let p = ob.orders[index as usize].prev;
+    let n = ob.orders[index as usize].next;
+
+    if p != SENTINEL {
+        ob.orders[p as usize].next = n;
+    } else {
+        if side == OrderSide::BID {
+            ob.bid_head = n;
+        } else {
+            ob.ask_head = n;
+        }
+    }
+
+    if n != SENTINEL {
+        ob.orders[n as usize].prev = p;
+    }
+
+    push_free_node(ob, index);
+}
