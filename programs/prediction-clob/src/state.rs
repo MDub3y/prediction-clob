@@ -61,6 +61,17 @@ pub struct Orderbook {
 
 #[account]
 #[derive(InitSpace)]
+pub struct UserAccount {
+    pub owner: Pubkey,
+    pub market: Pubkey,
+    pub unclaimed_collateral: u64,
+    pub unclaimed_outcome_a: u64,
+    pub unclaimed_outcome_b: u64,
+    pub bump: u8,
+}
+
+#[account]
+#[derive(InitSpace)]
 pub struct Market {
     pub authority: Pubkey,
     pub market_id: u32,
