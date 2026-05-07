@@ -72,9 +72,9 @@ pub struct Orderbook {
 pub struct UserAccount {
     pub owner: Pubkey,
     pub market: Pubkey,
-    pub unclaimed_collateral: u64,
-    pub unclaimed_outcome_a: u64,
-    pub unclaimed_outcome_b: u64,
+    pub collateral_balance: u64,
+    pub outcome_a_balance: u64,
+    pub outcome_b_balance: u64,
     pub bump: u8,
 }
 
