@@ -33,7 +33,7 @@ pub fn handle_place_order(
     let mut ob_a = ctx.accounts.orderbook_a.load_mut()?;
     let mut ob_b = ctx.accounts.orderbook_b.load_mut()?;
 
-    let complement_price = 100u64.saturating_sub(price);
+    let _complement_price = 100u64.saturating_sub(price);
 
     let target_ob = if is_buying_a { &mut ob_a } else { &mut ob_b };
     let match_result = execute_match(target_ob, OrderSide::BID, quantity, price);
@@ -74,16 +74,4 @@ pub fn handle_place_order(
     }
 
     Ok(())
-}
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("The orderbook is full.")]
-    BookFull,
-    #[msg("Market order could not be filled within slippage limits.")]
-    SlippageExceeded,
-    #[msg("Math overflow.")]
-    MathOverflow,
-    #[msg("No funds available to claim.")]
-    NothingToClaim,
 }
