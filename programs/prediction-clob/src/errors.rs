@@ -10,4 +10,10 @@ pub enum ErrorCode {
     MathOverflow,
     #[msg("No funds available to claim.")]
     NothingToClaim,
+    #[msg("The market has already been settled.")]
+    MarketAlreadySettled,
+    #[msg("The event has not reached its settlement deadline yet.")]
+    MarketNotExpired,
+    #[msg("The challenge period is still active.")]
+    ChallengePeriodActive,
 }

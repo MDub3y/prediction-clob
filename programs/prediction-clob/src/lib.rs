@@ -26,4 +26,16 @@ pub mod prediction_clob {
     ) -> Result<()> {
         instructions::place_order::handle_place_order(ctx, is_buying_a, quantity, price)
     }
+
+    pub fn claim_collateral(ctx: Context<ClaimFunds>) -> Result<()> {
+        instructions::claim_funds::handle_claim_collateral(ctx)
+    }
+
+    pub fn propose_outcome(ctx: Context<ProposeOutcome>, reported_outcome: u8) -> Result<()> {
+        instructions::resolution::handle_propose_outcome(ctx, reported_outcome)
+    }
+
+    pub fn finalize_market(ctx: Context<FinalizeMarket>) -> Result<()> {
+        instructions::resolution::handle_finalize_market(ctx)
+    }
 }
