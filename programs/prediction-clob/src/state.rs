@@ -13,12 +13,11 @@ pub struct OrderSide {
 impl OrderSide {
     pub const BID: Self = Self { val: 0 };
     pub const ASK: Self = Self { val: 1 };
-
     pub fn opposite(&self) -> Self {
-        if *self == Self::BID {
-            Self::ASK
+        if self.val == 0 {
+            Self { val: 1 }
         } else {
-            Self::BID
+            Self { val: 0 }
         }
     }
 }
@@ -32,7 +31,6 @@ pub struct OrderStatus {
 impl OrderStatus {
     pub const OPEN: Self = Self { val: 0 };
     pub const FILLED: Self = Self { val: 1 };
-    pub const PARTIALLY_FILLED: Self = Self { val: 2 };
     pub const CANCELLED: Self = Self { val: 3 };
 }
 
@@ -61,7 +59,9 @@ pub struct Orderbook {
     pub ask_head: u32,
     pub free_head: u32,
     pub active_orders: u32,
-    pub last_order_id: u64,
+    pub last_traded_price: u64,
+    pub unclaimed_fees: u64,
+    pub fee_rate_bps: u64,
     pub bump: u8,
     pub _padding: [u8; 7],
     pub orders: [OrderNode; MAX_ORDERS],
@@ -84,12 +84,15 @@ pub struct Market {
     pub authority: Pubkey,
     pub market_id: u32,
     pub settlement_deadline: i64,
+    pub collateral_vault: Pubkey,
     pub outcome_a_mint: Pubkey,
     pub outcome_b_mint: Pubkey,
     pub collateral_mint: Pubkey,
-    pub collateral_vault: Pubkey,
     pub is_settled: bool,
     pub winning_outcome: Option<u8>,
+    pub reported_outcome: Option<u8>,
+    pub report_timestamp: i64,
+    pub challenge_end_timestamp: i64,
     pub total_collateral_locked: u64,
     pub bump: u8,
 }

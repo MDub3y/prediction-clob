@@ -21,18 +21,13 @@ pub struct ClaimFunds<'info> {
     pub user: Signer<'info>,
 }
 
-pub fn handle_claim(ctx: Context<ClaimFunds>) -> Result<()> {
+pub fn handle_claim_collateral(ctx: Context<ClaimFunds>) -> Result<()> {
     let seat = &mut ctx.accounts.user_account;
-
     let amount = seat.collateral_balance;
-
     require!(amount > 0, ErrorCode::NothingToClaim);
 
     let market_id_bytes = ctx.accounts.market.market_id.to_le_bytes();
-    let bump = ctx.accounts.market.bump;
-
-    let seeds: &[&[u8]] = &[b"market", &market_id_bytes, &[bump]];
-    let signer_seeds = &[seeds];
+    let seeds: &[&[u8]] = &[b"market", &market_id_bytes, &[ctx.accounts.market.bump]];
 
     token::transfer(
         CpiContext::new_with_signer(
@@ -42,13 +37,11 @@ pub fn handle_claim(ctx: Context<ClaimFunds>) -> Result<()> {
                 to: ctx.accounts.user_collateral_ata.to_account_info(),
                 authority: ctx.accounts.market.to_account_info(),
             },
-            signer_seeds,
+            &[seeds],
         ),
         amount,
     )?;
 
     seat.collateral_balance = 0;
-
-    msg!("Claimed {} USDC from orderbook fills", amount);
     Ok(())
 }

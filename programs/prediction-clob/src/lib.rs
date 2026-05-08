@@ -19,11 +19,10 @@ pub mod prediction_clob {
 
     pub fn place_order(
         ctx: Context<PlaceOrder>,
-        side: u8,
+        is_buying_a: bool,
         quantity: u64,
         price: u64,
-        is_market: bool,
     ) -> Result<()> {
-        instructions::place_order::handle_place_order(ctx, side, quantity, price, is_market)
+        instructions::place_order::handle_place_order(ctx, is_buying_a, quantity, price)
     }
 }

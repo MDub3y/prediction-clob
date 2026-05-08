@@ -7,16 +7,18 @@ use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 #[derive(Accounts)]
 pub struct PlaceOrder<'info> {
     #[account(mut)]
-    pub orderbook: AccountLoader<'info, Orderbook>,
+    pub orderbook_a: AccountLoader<'info, Orderbook>,
+    #[account(mut)]
+    pub orderbook_b: AccountLoader<'info, Orderbook>,
     #[account(mut)]
     pub market: Account<'info, Market>,
     #[account(mut)]
-    pub user_account: Account<'info, UserAccount>, // Taker's internal ledger
+    pub user_account: Account<'info, UserAccount>,
     #[account(mut)]
     pub user: Signer<'info>,
-    #[account(mut, constraint = user_token_account.owner == user.key())]
-    pub user_token_account: Account<'info, TokenAccount>,
-    #[account(mut, constraint = market_vault.key() == market.collateral_vault)]
+    #[account(mut)]
+    pub user_collateral_ata: Account<'info, TokenAccount>,
+    #[account(mut)]
     pub market_vault: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub clock: Sysvar<'info, Clock>,
@@ -24,76 +26,51 @@ pub struct PlaceOrder<'info> {
 
 pub fn handle_place_order(
     ctx: Context<PlaceOrder>,
-    side: u8,
+    is_buying_a: bool,
     quantity: u64,
     price: u64,
-    is_market: bool,
 ) -> Result<()> {
-    let mut ob = ctx.accounts.orderbook.load_mut()?;
-    let taker_side = OrderSide { val: side };
-    let timestamp = ctx.accounts.clock.unix_timestamp;
+    let mut ob_a = ctx.accounts.orderbook_a.load_mut()?;
+    let mut ob_b = ctx.accounts.orderbook_b.load_mut()?;
 
-    // Pre-transfer: Escrow the maximum possible cost of this order
-    let deposit_amount = if taker_side == OrderSide::BID {
-        quantity.checked_mul(price).ok_or(ErrorCode::MathOverflow)?
-    } else {
-        quantity
-    };
+    let complement_price = 100u64.saturating_sub(price);
 
+    let target_ob = if is_buying_a { &mut ob_a } else { &mut ob_b };
+    let match_result = execute_match(target_ob, OrderSide::BID, quantity, price);
+
+    let cost = quantity.checked_mul(price).unwrap();
     token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
-                from: ctx.accounts.user_token_account.to_account_info(),
+                from: ctx.accounts.user_collateral_ata.to_account_info(),
                 to: ctx.accounts.market_vault.to_account_info(),
                 authority: ctx.accounts.user.to_account_info(),
             },
         ),
-        deposit_amount,
+        cost,
     )?;
 
-    // Execute the Match
-    let match_result = execute_match(&mut ob, taker_side, quantity, price);
-
-    // Post-Match: Update Taker's Internal Ledger
-    // If I bid and matched, I spent USDC and gained Tokens
-    let taker_ledger = &mut ctx.accounts.user_account;
-    if taker_side == OrderSide::BID {
-        // We Gain Outcome Tokens (Base)
-        taker_ledger.outcome_a_balance = taker_ledger
-            .outcome_a_balance
-            .checked_add(match_result.base_filled)
-            .ok_or(ErrorCode::MathOverflow)?;
-
-        // If it was a Limit order, the remaining USDC stays "locked" in the OrderNode
-        // If it was a Market order, we might need to refund excess USDC (simplified here)
+    let user_ledger = &mut ctx.accounts.user_account;
+    if is_buying_a {
+        user_ledger.outcome_a_balance += match_result.base_filled;
     } else {
-        // We Gain USDC (Quote)
-        taker_ledger.collateral_balance = taker_ledger
-            .collateral_balance
-            .checked_add(match_result.quote_filled)
-            .ok_or(ErrorCode::MathOverflow)?;
+        user_ledger.outcome_b_balance += match_result.base_filled;
     }
 
-    // 4. If Limit Order & remains: Add to Book
-    if !is_market && match_result.remaining_quantity > 0 {
-        if let Some(new_idx) = pop_free_node(&mut ob) {
-            let node = &mut ob.orders[new_idx as usize];
+    if match_result.remaining_quantity > 0 {
+        if let Some(idx) = pop_free_node(target_ob) {
+            let node = &mut target_ob.orders[idx as usize];
             node.user = ctx.accounts.user.key();
             node.price = Ticks { val: price };
             node.quantity = BaseLots { val: quantity };
             node.filled_quantity = BaseLots {
                 val: match_result.base_filled,
             };
-            node.side = taker_side;
+            node.side = OrderSide::BID;
             node.status = OrderStatus::OPEN;
-            node.timestamp = timestamp;
-            insert_sorted(&mut ob, new_idx, taker_side);
-        } else {
-            return Err(error!(ErrorCode::BookFull));
+            insert_sorted(target_ob, idx, OrderSide::BID);
         }
-    } else if is_market && match_result.remaining_quantity > 0 {
-        return Err(error!(ErrorCode::SlippageExceeded));
     }
 
     Ok(())

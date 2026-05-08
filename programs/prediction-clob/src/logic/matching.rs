@@ -1,11 +1,11 @@
-use anchor_lang::solana_program::pubkey::Pubkey;
-
 use crate::logic::linked_list::*;
 use crate::state::*;
+use anchor_lang::prelude::*;
 
 pub struct MatchResult {
     pub base_filled: u64,
     pub quote_filled: u64,
+    pub total_fee: u64,
     pub remaining_quantity: u64,
     pub makers_to_settle: Vec<FilledMaker>,
 }
@@ -25,6 +25,7 @@ pub fn execute_match(
     let mut remaining = taker_quantity;
     let mut total_quote = 0u64;
     let mut total_base = 0u64;
+    let mut total_fee = 0u64;
     let mut makers = Vec::new();
 
     let mut maker_idx = if taker_side == OrderSide::BID {
@@ -36,7 +37,6 @@ pub fn execute_match(
     while maker_idx != SENTINEL && remaining > 0 {
         let (maker_user, maker_price, fill_amt, is_full_fill) = {
             let maker_node = &mut ob.orders[maker_idx as usize];
-
             let price_ok = if taker_side == OrderSide::BID {
                 maker_node.price.val <= limit_price
             } else {
@@ -48,21 +48,36 @@ pub fn execute_match(
 
             let available = maker_node.quantity.val - maker_node.filled_quantity.val;
             let fill = std::cmp::min(remaining, available);
-
             maker_node.filled_quantity.val += fill;
-            let full = maker_node.filled_quantity.val == maker_node.quantity.val;
-
-            (maker_node.user, maker_node.price.val, fill, full)
+            (
+                maker_node.user,
+                maker_node.price.val,
+                fill,
+                maker_node.filled_quantity.val == maker_node.quantity.val,
+            )
         };
+
+        // Fee
+        let p = maker_price;
+        let one_minus_p = 100u64.saturating_sub(p);
+        let fee = fill_amt
+            .checked_mul(ob.fee_rate_bps)
+            .unwrap()
+            .checked_mul(p)
+            .unwrap()
+            .checked_mul(one_minus_p)
+            .unwrap()
+            / 1_000_000;
 
         remaining -= fill_amt;
         total_base += fill_amt;
         total_quote += fill_amt * maker_price;
+        total_fee += fee;
 
         makers.push(FilledMaker {
             user: maker_user,
             base_delta: fill_amt,
-            quote_delta: fill_amt * maker_price,
+            quote_delta: (fill_amt * maker_price).saturating_sub(fee),
         });
 
         if is_full_fill {
@@ -74,9 +89,15 @@ pub fn execute_match(
         }
     }
 
+    if total_base > 0 {
+        ob.last_traded_price = limit_price;
+    }
+    ob.unclaimed_fees += total_fee;
+
     MatchResult {
         base_filled: total_base,
         quote_filled: total_quote,
+        total_fee,
         remaining_quantity: remaining,
         makers_to_settle: makers,
     }

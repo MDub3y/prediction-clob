@@ -38,7 +38,7 @@ pub fn handle_initialize_orderbook(ctx: Context<InitializeOrderbook>) -> Result<
     ob.ask_head = SENTINEL;
     ob.free_head = 0;
     ob.active_orders = 0;
-    ob.last_order_id = 0;
+    ob.last_traded_price = 0;
     ob.bump = ctx.bumps.orderbook;
 
     for i in 0..MAX_ORDERS {
