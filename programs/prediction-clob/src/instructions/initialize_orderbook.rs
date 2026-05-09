@@ -3,7 +3,6 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
 #[derive(Accounts)]
-#[instruction(market: Market)]
 pub struct InitializeOrderbook<'info> {
     #[account(
         init,
