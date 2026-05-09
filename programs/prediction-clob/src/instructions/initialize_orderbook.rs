@@ -4,13 +4,7 @@ use anchor_spl::token::Mint;
 
 #[derive(Accounts)]
 pub struct InitializeOrderbook<'info> {
-    #[account(
-        init,
-        payer = payer,
-        space = 8 + std::mem::size_of::<Orderbook>(),
-        seeds = [b"orderbook", market.key().as_ref(), outcome_mint.key().as_ref()],
-        bump
-    )]
+    #[account(zero)]
     pub orderbook: AccountLoader<'info, Orderbook>,
 
     #[account(mut)]
@@ -38,7 +32,6 @@ pub fn handle_initialize_orderbook(ctx: Context<InitializeOrderbook>) -> Result<
     ob.free_head = 0;
     ob.active_orders = 0;
     ob.last_traded_price = 0;
-    ob.bump = ctx.bumps.orderbook;
 
     for i in 0..MAX_ORDERS {
         ob.orders[i].next = if i == MAX_ORDERS - 1 {

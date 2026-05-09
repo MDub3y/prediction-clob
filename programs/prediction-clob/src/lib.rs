@@ -14,6 +14,24 @@ declare_id!("2cffJrXyZjoN1jT2BB671BjeqfxaJzHGgfjAd8QZQ8qh");
 pub mod prediction_clob {
     use super::*;
 
+    pub fn initialize_market(
+        ctx: Context<InitializeMarket>,
+        market_id: u32,
+        deadline: i64,
+        o_a: Pubkey,
+        o_b: Pubkey,
+        collateral_mint: Pubkey,
+    ) -> Result<()> {
+        instructions::initialize_market::handle_initialize_market(
+            ctx,
+            market_id,
+            deadline,
+            o_a,
+            o_b,
+            collateral_mint,
+        )
+    }
+
     pub fn initialize_orderbook(ctx: Context<InitializeOrderbook>) -> Result<()> {
         instructions::initialize_orderbook::handle_initialize_orderbook(ctx)
     }

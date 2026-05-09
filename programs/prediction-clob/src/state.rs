@@ -5,7 +5,7 @@ pub const MAX_ORDERS: usize = 1024;
 pub const SENTINEL: u32 = u32::MAX;
 
 #[zero_copy]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct OrderSide {
     pub val: u8,
 }
@@ -23,7 +23,7 @@ impl OrderSide {
 }
 
 #[zero_copy]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct OrderStatus {
     pub val: u8,
 }
@@ -35,7 +35,8 @@ impl OrderStatus {
 }
 
 #[zero_copy]
-#[derive(Debug, PartialEq)]
+#[repr(C)]
+#[derive(Debug, PartialEq, Default)]
 pub struct OrderNode {
     pub user: Pubkey,
     pub order_id: u64,
@@ -51,6 +52,7 @@ pub struct OrderNode {
 }
 
 #[account(zero_copy)]
+#[repr(C)]
 pub struct Orderbook {
     pub market: Pubkey,
     pub outcome_mint: Pubkey,
