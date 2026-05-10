@@ -32,6 +32,10 @@ pub mod prediction_clob {
         )
     }
 
+    pub fn initialize_user_account(ctx: Context<InitializeUserAccount>) -> Result<()> {
+        instructions::initialize_user_account::handle_initialize_user_account(ctx)
+    }
+
     pub fn initialize_orderbook(ctx: Context<InitializeOrderbook>) -> Result<()> {
         instructions::initialize_orderbook::handle_initialize_orderbook(ctx)
     }

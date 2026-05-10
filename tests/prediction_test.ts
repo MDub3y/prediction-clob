@@ -1,12 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import {
-    PublicKey,
-    SystemProgram,
-    Keypair,
-    Transaction
-} from "@solana/web3.js";
-import { createMint } from "@solana/spl-token";
+import { PublicKey, SystemProgram, Keypair, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import { createMint, getOrCreateAssociatedTokenAccount, mintTo, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import assert from "assert";
 import { PredictionClob } from "../target/types/prediction_clob";
 
@@ -14,22 +9,22 @@ describe("prediction-clob-integration", () => {
     const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
     const program = anchor.workspace.PredictionClob as Program<PredictionClob>;
+    const payer = (provider.wallet as anchor.Wallet).payer;
 
-    const SENTINEL = 4294967295;
     const marketId = 1;
 
     let marketPda: PublicKey;
     let collateralMint: PublicKey;
     let outcomeAMint: PublicKey;
     let outcomeBMint: PublicKey;
+    let userAccountPda: PublicKey;
+    let marketVault: PublicKey;
+    let userCollateralAta: PublicKey;
 
-    // 🏗️ CHANGE: orderbook is now a Keypair, not just a PublicKey
-    let orderbookKeypair = Keypair.generate();
+    let obAKeypair = Keypair.generate();
+    let obBKeypair = Keypair.generate();
 
-    it("Initializes Market and a Large 90KB Orderbook", async () => {
-        const payer = (provider.wallet as anchor.Wallet).payer;
-
-        console.log("Creating SPL Mints...");
+    before(async () => {
         collateralMint = await createMint(provider.connection, payer, payer.publicKey, null, 6);
         outcomeAMint = await createMint(provider.connection, payer, payer.publicKey, null, 0);
         outcomeBMint = await createMint(provider.connection, payer, payer.publicKey, null, 0);
@@ -41,45 +36,90 @@ describe("prediction-clob-integration", () => {
             program.programId
         );
 
-        console.log("Initializing Market...");
+        [userAccountPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from("user"), marketPda.toBuffer(), payer.publicKey.toBuffer()],
+            program.programId
+        );
+
+        userCollateralAta = (await getOrCreateAssociatedTokenAccount(
+            provider.connection, payer, collateralMint, payer.publicKey
+        )).address;
+
+        marketVault = (await getOrCreateAssociatedTokenAccount(
+            provider.connection, payer, collateralMint, marketPda, true
+        )).address;
+
+        await mintTo(provider.connection, payer, collateralMint, userCollateralAta, payer, 1000_000_000);
+    });
+
+    it("Performs Full System Initialization", async () => {
         const deadline = new anchor.BN(Math.floor(Date.now() / 1000) + 86400);
+
         await program.methods
             .initializeMarket(marketId, deadline, outcomeAMint, outcomeBMint, collateralMint)
-            .accounts({
-                market: marketPda,
-                authority: payer.publicKey,
-                systemProgram: SystemProgram.programId,
-            } as any)
+            .accounts({ market: marketPda, authority: payer.publicKey } as any)
             .rpc();
 
         const ORDERBOOK_SPACE = 8 + 90256;
-        const lamports = await provider.connection.getMinimumBalanceForRentExemption(ORDERBOOK_SPACE);
+        const rent = await provider.connection.getMinimumBalanceForRentExemption(ORDERBOOK_SPACE);
 
-        console.log(`Pre-allocating ${ORDERBOOK_SPACE} bytes for Orderbook...`);
-        const createOrderbookIx = SystemProgram.createAccount({
-            fromPubkey: payer.publicKey,
-            newAccountPubkey: orderbookKeypair.publicKey,
-            lamports,
-            space: ORDERBOOK_SPACE,
-            programId: program.programId,
-        });
+        for (let [kb, mint] of [[obAKeypair, outcomeAMint], [obBKeypair, outcomeBMint]] as const) {
+            const createIx = SystemProgram.createAccount({
+                fromPubkey: payer.publicKey,
+                newAccountPubkey: kb.publicKey,
+                lamports: rent,
+                space: ORDERBOOK_SPACE,
+                programId: program.programId,
+            });
 
-        console.log("Initializing Orderbook (Instruction)...");
+            await program.methods
+                .initializeOrderbook()
+                .accounts({
+                    orderbook: kb.publicKey,
+                    market: marketPda,
+                    outcomeMint: mint,
+                    payer: payer.publicKey,
+                } as any)
+                .preInstructions([createIx])
+                .signers([kb])
+                .rpc();
+        }
+
+        console.log("Initializing User Account PDA...");
         await program.methods
-            .initializeOrderbook()
+            .initializeUserAccount()
             .accounts({
-                orderbook: orderbookKeypair.publicKey,
+                userAccount: userAccountPda,
                 market: marketPda,
-                outcomeMint: outcomeAMint,
-                payer: payer.publicKey,
+                owner: payer.publicKey,
                 systemProgram: SystemProgram.programId,
             } as any)
-            .preInstructions([createOrderbookIx])
-            .signers([orderbookKeypair])
+            .rpc();
+    });
+
+    it("Places an order and verifies positions", async () => {
+        const price = new anchor.BN(50);
+        const quantity = new anchor.BN(10);
+
+        await program.methods
+            .placeOrder(true, quantity, price)
+            .accounts({
+                orderbookA: obAKeypair.publicKey,
+                orderbookB: obBKeypair.publicKey,
+                market: marketPda,
+                userAccount: userAccountPda,
+                user: payer.publicKey,
+                userCollateralAta: userCollateralAta,
+                marketVault: marketVault,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                clock: SYSVAR_CLOCK_PUBKEY,
+            } as any)
             .rpc();
 
-        const obState = await program.account.orderbook.fetch(orderbookKeypair.publicKey);
-        assert.strictEqual(obState.freeHead, 0);
-        console.log("✅ 90KB Orderbook successfully initialized via pre-allocation!");
+        const userState = await program.account.userAccount.fetch(userAccountPda);
+        console.log(`User Outcome A Position: ${userState.outcomeABalance}`);
+
+        assert.ok(userState.owner.equals(payer.publicKey));
+        console.log("✅ User Portfolio PDA correctly tracking position.");
     });
 });
