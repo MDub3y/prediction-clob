@@ -10,6 +10,10 @@ This project implements a binary outcome prediction market where users can trade
 
 Architecture
 ------------
+<img width="821" height="527" alt="Screenshot 2026-05-10 222447" src="https://github.com/user-attachments/assets/e9dd4b22-a564-4347-8369-e011c99b8a57" />
+</br>
+<img width="887" height="906" alt="Screenshot 2026-05-10 221937" src="https://github.com/user-attachments/assets/90673b5e-0563-40dc-a662-3b00091e40e6" />
+
 
 *   **Market Genesis:** Creator initializes the Market PDA for metadata and a PDA-owned Token Vault for collateral escrow.
     
