@@ -19,10 +19,8 @@ pub fn handle_propose_outcome(ctx: Context<ProposeOutcome>, reported_outcome: u8
         ErrorCode::MarketNotExpired
     );
 
-    // Set the proposed outcome and the challenge clock
     market.reported_outcome = Some(reported_outcome);
     market.report_timestamp = clock.unix_timestamp;
-    // 24-hour challenge period (86400 seconds)
     market.challenge_end_timestamp = clock.unix_timestamp + 86400;
 
     msg!(
@@ -42,7 +40,7 @@ pub fn handle_finalize_market(ctx: Context<FinalizeMarket>) -> Result<()> {
     let market = &mut ctx.accounts.market;
     let clock = Clock::get()?;
 
-    let reported = market.reported_outcome.ok_or(ErrorCode::NothingToClaim)?; // Reuse or add error
+    let reported = market.reported_outcome.ok_or(ErrorCode::NothingToClaim)?;
     require!(
         clock.unix_timestamp > market.challenge_end_timestamp,
         ErrorCode::ChallengePeriodActive
