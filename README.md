@@ -8,6 +8,29 @@ Description
 
 This project implements a binary outcome prediction market where users can trade outcome tokens using a peer-to-peer order book. It leverages Solana's high-throughput capabilities and Anchor's zero\_copy account structures to manage large-scale financial state with minimal latency and maximum capital efficiency.
 
+Architecture
+------------
+
+*   **Market Genesis:** Creator initializes the Market PDA for metadata and a PDA-owned Token Vault for collateral escrow.
+    
+*   **Orderbook Allocation:** Large 90KB+ accounts are pre-allocated client-side to hold 1024 nodes in bidirectional linked lists.
+    
+*   **User Onboarding:** UserAccount PDA tracks "Escrowed Collateral" (funds in open orders) using seeds \[b"user", market, wallet\].
+    
+*   **Lazy Tokenization:** Outcome ATAs are created via idempotent frontend instructions only when a user intends to hold shares.
+    
+*   **Matching Engine:** Price-time priority logic crossings trigger mint\_to of outcome tokens directly to user wallets.
+    
+*   **Collateral Escrow:** Funds move from User ATA to the Market Vault upon order placement; makers receive quote deltas upon fill.
+    
+*   **Platform Fees:** A u64 counter tracks unclaimed fees in the Orderbook, allowing for efficient bulk sweeps to a global fee account.
+    
+*   **Settlement Freeze:** Finalization sets the winning outcome and transitions the program to a "Settled" state, disabling all trade instructions.
+    
+*   **Liquidation/Claiming:** Users burn winning tokens through a claim\_collateral instruction to receive their portion of the Market Vault.
+    
+*   **Account Cleanup:** Rent-exempt lamports are reclaimed by closing UserAccount and Market PDAs once balances are zeroed.
+
 Project Structure
 -----------------
 
@@ -34,28 +57,6 @@ Project Structure
     ├── migrations/                       # Deployment scripts
     └── Anchor.toml                       # Workspace configuration
 
-Architecture
-------------
-
-*   **Market Genesis:** Creator initializes the Market PDA for metadata and a PDA-owned Token Vault for collateral escrow.
-    
-*   **Orderbook Allocation:** Large 90KB+ accounts are pre-allocated client-side to hold 1024 nodes in bidirectional linked lists.
-    
-*   **User Onboarding:** UserAccount PDA tracks "Escrowed Collateral" (funds in open orders) using seeds \[b"user", market, wallet\].
-    
-*   **Lazy Tokenization:** Outcome ATAs are created via idempotent frontend instructions only when a user intends to hold shares.
-    
-*   **Matching Engine:** Price-time priority logic crossings trigger mint\_to of outcome tokens directly to user wallets.
-    
-*   **Collateral Escrow:** Funds move from User ATA to the Market Vault upon order placement; makers receive quote deltas upon fill.
-    
-*   **Platform Fees:** A u64 counter tracks unclaimed fees in the Orderbook, allowing for efficient bulk sweeps to a global fee account.
-    
-*   **Settlement Freeze:** Finalization sets the winning outcome and transitions the program to a "Settled" state, disabling all trade instructions.
-    
-*   **Liquidation/Claiming:** Users burn winning tokens through a claim\_collateral instruction to receive their portion of the Market Vault.
-    
-*   **Account Cleanup:** Rent-exempt lamports are reclaimed by closing UserAccount and Market PDAs once balances are zeroed.
 
 ### Account Model
 
