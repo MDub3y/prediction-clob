@@ -122,4 +122,57 @@ describe("prediction-clob-integration", () => {
         assert.ok(userState.owner.equals(payer.publicKey));
         console.log("✅ User Portfolio PDA correctly tracking position.");
     });
+
+    it("Claims collateral back to user ATA", async () => {
+        let userState = await program.account.userAccount.fetch(userAccountPda);
+        const amountToClaim = userState.collateralBalance;
+
+        if (amountToClaim.isZero()) {
+            console.log("⚠️ collateralBalance is 0. Expecting 'NothingToClaim' error.");
+            try {
+                await program.methods
+                    .claimCollateral()
+                    .accounts({
+                        userAccount: userAccountPda,
+                        market: marketPda,
+                        collateralVault: marketVault,
+                        userCollateralAta: userCollateralAta,
+                        tokenProgram: TOKEN_PROGRAM_ID,
+                        user: payer.publicKey,
+                    } as any)
+                    .rpc();
+                assert.fail("Should have failed with NothingToClaim");
+            } catch (err) {
+                assert.ok(err.logs.join("").includes("NothingToClaim") || err.message.includes("6000"));
+                console.log("✅ Corrected rejected claim for zero balance.");
+            }
+            return;
+        }
+
+        const ataBefore = (await provider.connection.getTokenAccountBalance(userCollateralAta)).value.amount;
+
+        const tx = await program.methods
+            .claimCollateral()
+            .accounts({
+                userAccount: userAccountPda,
+                market: marketPda,
+                collateralVault: marketVault,
+                userCollateralAta: userCollateralAta,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                user: payer.publicKey,
+            } as any)
+            .rpc();
+
+        console.log("✅ Claim TX:", tx);
+
+        const ataAfter = (await provider.connection.getTokenAccountBalance(userCollateralAta)).value.amount;
+        const userStateAfter = await program.account.userAccount.fetch(userAccountPda);
+
+        assert.strictEqual(
+            Number(ataAfter) - Number(ataBefore),
+            amountToClaim.toNumber(),
+            "User ATA should increase by the claimed amount"
+        );
+        assert.strictEqual(userStateAfter.collateralBalance.toNumber(), 0, "Ledger balance should be reset to 0");
+    });
 });
