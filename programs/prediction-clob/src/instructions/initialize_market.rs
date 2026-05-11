@@ -15,7 +15,22 @@ pub struct InitializeMarket<'info> {
 
     #[account(mut)]
     pub authority: Signer<'info>,
+
+    pub collateral_mint: Account<'info, anchor_spl::token::Mint>,
+
+    #[account(
+        init,
+        payer = authority,
+        token::mint = collateral_mint,
+        token::authority = market,
+        seeds = [b"vault", market.key().as_ref(), collateral_mint.key().as_ref()],
+        bump
+    )]
+    pub market_vault: Account<'info, anchor_spl::token::TokenAccount>,
+
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, anchor_spl::token::Token>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handle_initialize_market(

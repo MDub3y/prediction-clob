@@ -1,5 +1,6 @@
 use crate::state::*;
 use anchor_lang::prelude::*;
+use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
 #[derive(Accounts)]
@@ -10,16 +11,33 @@ pub struct SplitMerge<'info> {
     pub outcome_a_mint: Account<'info, Mint>,
     #[account(mut)]
     pub outcome_b_mint: Account<'info, Mint>,
-    #[account(mut)]
+
+    #[account(
+        init_if_needed,
+        payer = user,
+        associated_token::mint = outcome_a_mint,
+        associated_token::authority = user
+    )]
     pub user_outcome_a_ata: Account<'info, TokenAccount>,
-    #[account(mut)]
+
+    #[account(
+        init_if_needed,
+        payer = user,
+        associated_token::mint = outcome_b_mint,
+        associated_token::authority = user
+    )]
     pub user_outcome_b_ata: Account<'info, TokenAccount>,
+
     #[account(mut)]
     pub user_collateral_ata: Account<'info, TokenAccount>,
     #[account(mut)]
     pub market_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
     pub user: Signer<'info>,
     pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn handle_split(ctx: Context<SplitMerge>, amount: u64) -> Result<()> {
