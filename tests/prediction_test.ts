@@ -11,6 +11,7 @@ describe("prediction-clob-integration", () => {
     const program = anchor.workspace.PredictionClob as Program<PredictionClob>;
     const payer = (provider.wallet as anchor.Wallet).payer;
 
+    const SENTINEL = 4294967295;
     const marketId = 1;
 
     let marketPda: PublicKey;
@@ -20,21 +21,23 @@ describe("prediction-clob-integration", () => {
     let userAccountPda: PublicKey;
     let marketVault: PublicKey;
     let userCollateralAta: PublicKey;
+    let userOutcomeAAta: PublicKey;
+    let userOutcomeBAta: PublicKey;
 
     let obAKeypair = Keypair.generate();
     let obBKeypair = Keypair.generate();
 
     before(async () => {
-        collateralMint = await createMint(provider.connection, payer, payer.publicKey, null, 6);
-        outcomeAMint = await createMint(provider.connection, payer, payer.publicKey, null, 0);
-        outcomeBMint = await createMint(provider.connection, payer, payer.publicKey, null, 0);
-
         const marketIdBuffer = Buffer.alloc(4);
         marketIdBuffer.writeUInt32LE(marketId);
         [marketPda] = PublicKey.findProgramAddressSync(
             [Buffer.from("market"), marketIdBuffer],
             program.programId
         );
+
+        collateralMint = await createMint(provider.connection, payer, payer.publicKey, null, 6);
+        outcomeAMint = await createMint(provider.connection, payer, marketPda, null, 0);
+        outcomeBMint = await createMint(provider.connection, payer, marketPda, null, 0);
 
         [userAccountPda] = PublicKey.findProgramAddressSync(
             [Buffer.from("user"), marketPda.toBuffer(), payer.publicKey.toBuffer()],
@@ -44,6 +47,9 @@ describe("prediction-clob-integration", () => {
         userCollateralAta = (await getOrCreateAssociatedTokenAccount(
             provider.connection, payer, collateralMint, payer.publicKey
         )).address;
+
+        userOutcomeAAta = (await getOrCreateAssociatedTokenAccount(provider.connection, payer, outcomeAMint, payer.publicKey)).address;
+        userOutcomeBAta = (await getOrCreateAssociatedTokenAccount(provider.connection, payer, outcomeBMint, payer.publicKey)).address;
 
         marketVault = (await getOrCreateAssociatedTokenAccount(
             provider.connection, payer, collateralMint, marketPda, true
@@ -85,7 +91,6 @@ describe("prediction-clob-integration", () => {
                 .rpc();
         }
 
-        console.log("Initializing User Account PDA...");
         await program.methods
             .initializeUserAccount()
             .accounts({
@@ -108,50 +113,157 @@ describe("prediction-clob-integration", () => {
                 orderbookB: obBKeypair.publicKey,
                 market: marketPda,
                 userAccount: userAccountPda,
+                outcomeAMint: outcomeAMint,
+                outcomeBMint: outcomeBMint,
+                userOutcomeAAta: userOutcomeAAta,
+                userOutcomeBAta: userOutcomeBAta,
                 user: payer.publicKey,
                 userCollateralAta: userCollateralAta,
                 marketVault: marketVault,
                 tokenProgram: TOKEN_PROGRAM_ID,
                 clock: SYSVAR_CLOCK_PUBKEY,
+                systemProgram: SystemProgram.programId,
             } as any)
             .rpc();
 
         const userState = await program.account.userAccount.fetch(userAccountPda);
-        console.log(`User Outcome A Position: ${userState.outcomeABalance}`);
-
         assert.ok(userState.owner.equals(payer.publicKey));
-        console.log("✅ User Portfolio PDA correctly tracking position.");
+
+        const obState = await program.account.orderbook.fetch(obAKeypair.publicKey);
+        await program.methods.cancelOrder(obState.bidHead, 0).accounts({
+            orderbook: obAKeypair.publicKey,
+            market: marketPda,
+            userAccount: userAccountPda,
+            user: payer.publicKey,
+        } as any).rpc();
+
+        await program.methods.claimCollateral().accounts({
+            userAccount: userAccountPda,
+            market: marketPda,
+            collateralVault: marketVault,
+            userCollateralAta: userCollateralAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            user: payer.publicKey,
+        } as any).rpc();
+
+        console.log("✅ Placement verified and book cleared.");
+    });
+
+    it("Splits 10 units of collateral into Outcome A and B tokens", async () => {
+        const amount = new anchor.BN(10);
+        await program.methods
+            .split(amount)
+            .accounts({
+                market: marketPda,
+                outcomeAMint: outcomeAMint,
+                outcomeBMint: outcomeBMint,
+                userOutcomeAAta: userOutcomeAAta,
+                userOutcomeBAta: userOutcomeBAta,
+                userCollateralAta: userCollateralAta,
+                marketVault: marketVault,
+                user: payer.publicKey,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            } as any)
+            .rpc();
+
+        const balA = await provider.connection.getTokenAccountBalance(userOutcomeAAta);
+        assert.strictEqual(balA.value.amount, "10", "Should have 10 A tokens");
+        console.log("✅ Split successful.");
+    });
+
+    it("Cancels an open order and refunds collateral to ledger", async () => {
+        const price = new anchor.BN(10);
+        const quantity = new anchor.BN(5);
+
+        await program.methods
+            .placeOrder(true, quantity, price)
+            .accounts({
+                orderbookA: obAKeypair.publicKey,
+                orderbookB: obBKeypair.publicKey,
+                market: marketPda,
+                userAccount: userAccountPda,
+                outcomeAMint: outcomeAMint,
+                outcomeBMint: outcomeBMint,
+                userOutcomeAAta: userOutcomeAAta,
+                userOutcomeBAta: userOutcomeBAta,
+                user: payer.publicKey,
+                userCollateralAta: userCollateralAta,
+                marketVault: marketVault,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                clock: SYSVAR_CLOCK_PUBKEY,
+                systemProgram: SystemProgram.programId,
+            } as any)
+            .rpc();
+
+        const obState = await program.account.orderbook.fetch(obAKeypair.publicKey);
+        const orderIdx = obState.bidHead;
+
+        await program.methods
+            .cancelOrder(orderIdx, 0)
+            .accounts({
+                orderbook: obAKeypair.publicKey,
+                market: marketPda,
+                userAccount: userAccountPda,
+                user: payer.publicKey,
+            } as any)
+            .rpc();
+
+        const userState = await program.account.userAccount.fetch(userAccountPda);
+        assert.strictEqual(userState.collateralBalance.toNumber(), 50, "Refund should be exactly 50");
+
+        await program.methods.claimCollateral().accounts({
+            userAccount: userAccountPda,
+            market: marketPda,
+            collateralVault: marketVault,
+            userCollateralAta: userCollateralAta,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            user: payer.publicKey,
+        } as any).rpc();
+
+        console.log("✅ Cancellation verified.");
     });
 
     it("Claims collateral back to user ATA", async () => {
-        let userState = await program.account.userAccount.fetch(userAccountPda);
-        const amountToClaim = userState.collateralBalance;
+        const price = new anchor.BN(20);
+        const quantity = new anchor.BN(5);
 
-        if (amountToClaim.isZero()) {
-            console.log("⚠️ collateralBalance is 0. Expecting 'NothingToClaim' error.");
-            try {
-                await program.methods
-                    .claimCollateral()
-                    .accounts({
-                        userAccount: userAccountPda,
-                        market: marketPda,
-                        collateralVault: marketVault,
-                        userCollateralAta: userCollateralAta,
-                        tokenProgram: TOKEN_PROGRAM_ID,
-                        user: payer.publicKey,
-                    } as any)
-                    .rpc();
-                assert.fail("Should have failed with NothingToClaim");
-            } catch (err) {
-                assert.ok(err.logs.join("").includes("NothingToClaim") || err.message.includes("6000"));
-                console.log("✅ Corrected rejected claim for zero balance.");
-            }
-            return;
-        }
+        await program.methods
+            .placeOrder(true, quantity, price)
+            .accounts({
+                orderbookA: obAKeypair.publicKey,
+                orderbookB: obBKeypair.publicKey,
+                market: marketPda,
+                userAccount: userAccountPda,
+                outcomeAMint: outcomeAMint,
+                outcomeBMint: outcomeBMint,
+                userOutcomeAAta: userOutcomeAAta,
+                userOutcomeBAta: userOutcomeBAta,
+                user: payer.publicKey,
+                userCollateralAta: userCollateralAta,
+                marketVault: marketVault,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                clock: SYSVAR_CLOCK_PUBKEY,
+                systemProgram: SystemProgram.programId,
+            } as any)
+            .rpc();
+
+        const obState = await program.account.orderbook.fetch(obAKeypair.publicKey);
+        await program.methods
+            .cancelOrder(obState.bidHead, 0)
+            .accounts({
+                orderbook: obAKeypair.publicKey,
+                market: marketPda,
+                userAccount: userAccountPda,
+                user: payer.publicKey,
+            } as any)
+            .rpc();
+
+        const userStateMid = await program.account.userAccount.fetch(userAccountPda);
+        const amountToClaim = userStateMid.collateralBalance; // Should be 100
 
         const ataBefore = (await provider.connection.getTokenAccountBalance(userCollateralAta)).value.amount;
 
-        const tx = await program.methods
+        await program.methods
             .claimCollateral()
             .accounts({
                 userAccount: userAccountPda,
@@ -163,16 +275,16 @@ describe("prediction-clob-integration", () => {
             } as any)
             .rpc();
 
-        console.log("✅ Claim TX:", tx);
-
         const ataAfter = (await provider.connection.getTokenAccountBalance(userCollateralAta)).value.amount;
         const userStateAfter = await program.account.userAccount.fetch(userAccountPda);
 
         assert.strictEqual(
             Number(ataAfter) - Number(ataBefore),
             amountToClaim.toNumber(),
-            "User ATA should increase by the claimed amount"
+            "User ATA should increase by the ledger amount"
         );
-        assert.strictEqual(userStateAfter.collateralBalance.toNumber(), 0, "Ledger balance should be reset to 0");
+        assert.strictEqual(userStateAfter.collateralBalance.toNumber(), 0, "Ledger should be empty after claim");
+
+        console.log(`✅ Successfully claimed ${amountToClaim.toNumber()} units from ledger to wallet.`);
     });
 });

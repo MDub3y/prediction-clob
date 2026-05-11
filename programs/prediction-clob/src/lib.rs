@@ -49,6 +49,22 @@ pub mod prediction_clob {
         instructions::place_order::handle_place_order(ctx, is_buying_a, quantity, price)
     }
 
+    pub fn cancel_order(ctx: Context<CancelOrder>, order_idx: u32, side: u8) -> Result<()> {
+        instructions::cancel_order::handle_cancel_order(ctx, order_idx, side)
+    }
+
+    pub fn split(ctx: Context<SplitMerge>, amount: u64) -> Result<()> {
+        instructions::split_merge::handle_split(ctx, amount)
+    }
+
+    pub fn merge(ctx: Context<SplitMerge>, amount: u64) -> Result<()> {
+        instructions::split_merge::handle_merge(ctx, amount)
+    }
+
+    pub fn sweep_fees(ctx: Context<SweepFees>) -> Result<()> {
+        instructions::sweep::handle_sweep_fees(ctx)
+    }
+
     pub fn claim_collateral(ctx: Context<ClaimFunds>) -> Result<()> {
         instructions::claim_funds::handle_claim_collateral(ctx)
     }

@@ -16,4 +16,10 @@ pub enum ErrorCode {
     MarketNotExpired,
     #[msg("The challenge period is still active.")]
     ChallengePeriodActive,
+    #[msg("Unauthorized: You do not own this order.")]
+    Unauthorized,
+    #[msg("The order is not in an open state.")]
+    OrderNotOpen,
+    #[msg("Insufficient balance for this operation.")]
+    InsufficientBalance,
 }
