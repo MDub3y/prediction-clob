@@ -34,15 +34,17 @@ pub fn handle_initialize_orderbook(ctx: Context<InitializeOrderbook>) -> Result<
     ob.last_traded_price = 0;
 
     for i in 0..MAX_ORDERS {
-        ob.orders[i].next = if i == MAX_ORDERS - 1 {
+        let node = &mut ob.orders[i];
+        node.next = if i == MAX_ORDERS - 1 {
             SENTINEL
         } else {
             (i + 1) as u32
         };
-        ob.orders[i].prev = SENTINEL;
-        ob.orders[i].status = OrderStatus::CANCELLED;
+        node.prev = SENTINEL;
+        node.status = OrderStatus::CANCELLED;
     }
 
     msg!("Orderbook initialized for outcome: {:?}", ob.outcome_mint);
+
     Ok(())
 }

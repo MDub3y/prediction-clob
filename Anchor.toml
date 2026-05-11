@@ -5,14 +5,17 @@ package_manager = "yarn"
 resolution = true
 skip-lint = false
 
+[programs.devnet]
+prediction_clob = "CwMjjUEkQzJWHJFZJWGS69GfymfPK25SHprcf6PzrWwR"
+
 [programs.localnet]
-prediction_clob = "2cffJrXyZjoN1jT2BB671BjeqfxaJzHGgfjAd8QZQ8qh"
+prediction_clob = "CwMjjUEkQzJWHJFZJWGS69GfymfPK25SHprcf6PzrWwR"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

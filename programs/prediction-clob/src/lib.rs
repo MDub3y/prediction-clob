@@ -8,7 +8,7 @@ pub mod state;
 
 use instructions::*;
 
-declare_id!("2cffJrXyZjoN1jT2BB671BjeqfxaJzHGgfjAd8QZQ8qh");
+declare_id!("CwMjjUEkQzJWHJFZJWGS69GfymfPK25SHprcf6PzrWwR");
 
 #[program]
 pub mod prediction_clob {

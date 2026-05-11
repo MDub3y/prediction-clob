@@ -19,7 +19,7 @@ import type {
 } from "@solana/transactions";
 
 const IDL = JSON.parse(fs.readFileSync("./target/idl/prediction_clob.json", "utf-8"));
-const PROGRAM_ID = new PublicKey("2cffJrXyZjoN1jT2BB671BjeqfxaJzHGgfjAd8QZQ8qh");
+const PROGRAM_ID = new PublicKey("CwMjjUEkQzJWHJFZJWGS69GfymfPK25SHprcf6PzrWwR");
 
 const getSvmSignatures = (tx: Transaction): SignaturesMap => {
     const signatures: SignaturesMap = {};
