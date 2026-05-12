@@ -30,8 +30,12 @@ pub mod prediction_clob {
         instructions::initialize_user_account::handle_initialize_user_account(ctx)
     }
 
-    pub fn initialize_orderbook(ctx: Context<InitializeOrderbook>) -> Result<()> {
-        instructions::initialize_orderbook::handle_initialize_orderbook(ctx)
+    pub fn initialize_orderbook(
+        ctx: Context<InitializeOrderbook>,
+        start_idx: u32,
+        batch_size: u32,
+    ) -> Result<()> {
+        instructions::initialize_orderbook::handle_initialize_orderbook(ctx, start_idx, batch_size)
     }
 
     pub fn place_order(

@@ -20,31 +20,41 @@ pub struct InitializeOrderbook<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handle_initialize_orderbook(ctx: Context<InitializeOrderbook>) -> Result<()> {
-    let mut ob = ctx.accounts.orderbook.load_mut()?;
+pub fn handle_initialize_orderbook(
+    ctx: Context<InitializeOrderbook>,
+    start_index: u32,
+    batch_size: u32,
+) -> Result<()> {
+    let mut ob = if start_index == 0 {
+        ctx.accounts.orderbook.load_init()?
+    } else {
+        ctx.accounts.orderbook.load_mut()?
+    };
 
-    ob.market = ctx.accounts.market.key();
-    ob.outcome_mint = ctx.accounts.outcome_mint.key();
-    ob.collateral_mint = ctx.accounts.market.collateral_mint;
+    if start_index == 0 {
+        ob.market = ctx.accounts.market.key();
+        ob.outcome_mint = ctx.accounts.outcome_mint.key();
+        ob.collateral_mint = ctx.accounts.market.collateral_mint;
+        ob.bid_head = SENTINEL;
+        ob.ask_head = SENTINEL;
+        ob.free_head = 0;
+        ob.active_orders = 0;
+        ob.last_traded_price = 0;
+    }
 
-    ob.bid_head = SENTINEL;
-    ob.ask_head = SENTINEL;
-    ob.free_head = 0;
-    ob.active_orders = 0;
-    ob.last_traded_price = 0;
+    let end_index = std::cmp::min(start_index + batch_size, MAX_ORDERS as u32);
 
-    for i in 0..MAX_ORDERS {
-        let node = &mut ob.orders[i];
-        node.next = if i == MAX_ORDERS - 1 {
+    for i in start_index..end_index {
+        let node = &mut ob.orders[i as usize];
+        node.next = if i == (MAX_ORDERS - 1) as u32 {
             SENTINEL
         } else {
-            (i + 1) as u32
+            i + 1
         };
         node.prev = SENTINEL;
         node.status = OrderStatus::CANCELLED;
     }
 
-    msg!("Orderbook initialized for outcome: {:?}", ob.outcome_mint);
-
+    msg!("Initialized nodes {} to {}", start_index, end_index - 1);
     Ok(())
 }
