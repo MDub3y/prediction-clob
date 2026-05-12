@@ -4,7 +4,13 @@ use anchor_spl::token::Mint;
 
 #[derive(Accounts)]
 pub struct InitializeOrderbook<'info> {
-    #[account(zero)]
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + std::mem::size_of::<Orderbook>(), 
+        seeds = [b"orderbook", market.key().as_ref(), outcome_mint.key().as_ref()],
+        bump
+    )]
     pub orderbook: AccountLoader<'info, Orderbook>,
 
     #[account(mut)]
@@ -21,7 +27,7 @@ pub struct InitializeOrderbook<'info> {
 }
 
 pub fn handle_initialize_orderbook(ctx: Context<InitializeOrderbook>) -> Result<()> {
-    let mut ob = ctx.accounts.orderbook.load_init()?;
+    let mut ob = ctx.accounts.orderbook.load_mut()?;
 
     ob.market = ctx.accounts.market.key();
     ob.outcome_mint = ctx.accounts.outcome_mint.key();

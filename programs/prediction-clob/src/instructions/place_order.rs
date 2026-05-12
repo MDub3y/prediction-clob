@@ -41,58 +41,56 @@ pub fn handle_place_order(
     is_buying_a: bool,
     quantity: u64,
     price: u64,
+    side: u8,
 ) -> Result<()> {
     let mut ob_a = ctx.accounts.orderbook_a.load_mut()?;
     let mut ob_b = ctx.accounts.orderbook_b.load_mut()?;
     let target_ob = if is_buying_a { &mut ob_a } else { &mut ob_b };
 
-    let match_result = execute_match(target_ob, OrderSide::BID, quantity, price);
+    let order_side = if side == 0 {
+        OrderSide::BID
+    } else {
+        OrderSide::ASK
+    };
 
-    if match_result.base_filled > 0 {
-        let market_id_bytes = ctx.accounts.market.market_id.to_le_bytes();
-        let seeds: &[&[u8]] = &[b"market", &market_id_bytes, &[ctx.accounts.market.bump]];
-        let signer = &[seeds];
+    let match_result = execute_match(target_ob, order_side, quantity, price);
 
-        let target_mint = if is_buying_a {
-            ctx.accounts.outcome_a_mint.to_account_info()
-        } else {
-            ctx.accounts.outcome_b_mint.to_account_info()
-        };
-
+    if order_side == OrderSide::BID {
+        let cost = quantity
+            .checked_mul(price)
+            .unwrap()
+            .checked_div(100)
+            .unwrap();
+        token::transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.user_collateral_ata.to_account_info(),
+                    to: ctx.accounts.market_vault.to_account_info(),
+                    authority: ctx.accounts.user.to_account_info(),
+                },
+            ),
+            cost,
+        )?;
+    } else {
         let target_ata = if is_buying_a {
             ctx.accounts.user_outcome_a_ata.to_account_info()
         } else {
             ctx.accounts.user_outcome_b_ata.to_account_info()
         };
 
-        token::mint_to(
-            CpiContext::new_with_signer(
+        token::transfer(
+            CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                token::MintTo {
-                    mint: target_mint,
-                    to: target_ata,
-                    authority: ctx.accounts.market.to_account_info(),
+                token::Transfer {
+                    from: target_ata,
+                    to: ctx.accounts.market_vault.to_account_info(),
+                    authority: ctx.accounts.user.to_account_info(),
                 },
-                signer,
             ),
-            match_result.base_filled,
+            quantity,
         )?;
     }
-
-    for _maker in match_result.makers_to_settle {}
-
-    let cost = quantity.checked_mul(price).unwrap();
-    token::transfer(
-        CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
-                from: ctx.accounts.user_collateral_ata.to_account_info(),
-                to: ctx.accounts.market_vault.to_account_info(),
-                authority: ctx.accounts.user.to_account_info(),
-            },
-        ),
-        cost,
-    )?;
 
     if match_result.remaining_quantity > 0 {
         if let Some(idx) = pop_free_node(target_ob) {
@@ -100,13 +98,10 @@ pub fn handle_place_order(
             node.user = ctx.accounts.user.key();
             node.price = Ticks { val: price };
             node.quantity = BaseLots { val: quantity };
-            node.filled_quantity = BaseLots {
-                val: match_result.base_filled,
-            };
-            node.side = OrderSide::BID;
+            node.side = order_side;
             node.status = OrderStatus::OPEN;
             node.timestamp = ctx.accounts.clock.unix_timestamp;
-            insert_sorted(target_ob, idx, OrderSide::BID);
+            insert_sorted(target_ob, idx, order_side);
         }
     }
 

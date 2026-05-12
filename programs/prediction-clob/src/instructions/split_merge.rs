@@ -32,8 +32,10 @@ pub struct SplitMerge<'info> {
     pub user_collateral_ata: Account<'info, TokenAccount>,
     #[account(mut)]
     pub market_vault: Account<'info, TokenAccount>,
+
     #[account(mut)]
     pub user: Signer<'info>,
+
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -50,7 +52,7 @@ pub fn handle_split(ctx: Context<SplitMerge>, amount: u64) -> Result<()> {
                 authority: ctx.accounts.user.to_account_info(),
             },
         ),
-        amount * 100,
+        amount,
     )?;
 
     let market_id_bytes = ctx.accounts.market.market_id.to_le_bytes();

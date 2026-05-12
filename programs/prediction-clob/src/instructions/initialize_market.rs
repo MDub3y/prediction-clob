@@ -39,7 +39,6 @@ pub fn handle_initialize_market(
     settlement_deadline: i64,
     outcome_a_mint: Pubkey,
     outcome_b_mint: Pubkey,
-    collateral_mint: Pubkey,
 ) -> Result<()> {
     let market = &mut ctx.accounts.market;
 
@@ -48,7 +47,7 @@ pub fn handle_initialize_market(
     market.settlement_deadline = settlement_deadline;
     market.outcome_a_mint = outcome_a_mint;
     market.outcome_b_mint = outcome_b_mint;
-    market.collateral_mint = collateral_mint;
+    market.collateral_mint = ctx.accounts.collateral_mint.key();
     market.is_settled = false;
     market.bump = ctx.bumps.market;
 

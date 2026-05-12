@@ -20,15 +20,9 @@ pub mod prediction_clob {
         deadline: i64,
         o_a: Pubkey,
         o_b: Pubkey,
-        collateral_mint: Pubkey,
     ) -> Result<()> {
         instructions::initialize_market::handle_initialize_market(
-            ctx,
-            market_id,
-            deadline,
-            o_a,
-            o_b,
-            collateral_mint,
+            ctx, market_id, deadline, o_a, o_b,
         )
     }
 
@@ -45,8 +39,9 @@ pub mod prediction_clob {
         is_buying_a: bool,
         quantity: u64,
         price: u64,
+        side: u8,
     ) -> Result<()> {
-        instructions::place_order::handle_place_order(ctx, is_buying_a, quantity, price)
+        instructions::place_order::handle_place_order(ctx, is_buying_a, quantity, price, side)
     }
 
     pub fn cancel_order(ctx: Context<CancelOrder>, order_idx: u32, side: u8) -> Result<()> {
