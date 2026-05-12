@@ -3,6 +3,11 @@ Prediction CLOB
 
 A high-performance decentralized prediction market built on the Solana blockchain utilizing a Central Limit Order Book (CLOB) architecture.
 
+Links
+-----
+
+Frontend: https://github.com/MDub3y/outcome-x
+
 Description
 -----------
 
