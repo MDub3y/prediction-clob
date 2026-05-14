@@ -1,9 +1,9 @@
+use crate::errors::ErrorCode;
 use crate::logic::*;
 use crate::quantities::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::Transfer;
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 #[derive(Accounts)]
 pub struct PlaceOrder<'info> {

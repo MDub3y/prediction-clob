@@ -44,8 +44,16 @@ pub mod prediction_clob {
         quantity: u64,
         price: u64,
         side: u8,
+        is_market: bool,
     ) -> Result<()> {
-        instructions::place_order::handle_place_order(ctx, is_buying_a, quantity, price, side)
+        instructions::place_order::handle_place_order(
+            ctx,
+            is_buying_a,
+            quantity,
+            price,
+            side,
+            is_market,
+        )
     }
 
     pub fn cancel_order(ctx: Context<CancelOrder>, order_idx: u32, side: u8) -> Result<()> {

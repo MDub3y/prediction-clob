@@ -20,6 +20,11 @@ pub enum ErrorCode {
     Unauthorized,
     #[msg("The order is not in an open state.")]
     OrderNotOpen,
-    #[msg("Insufficient balance for this operation.")]
-    InsufficientBalance,
+
+    #[msg("Insufficient collateral balance in ledger. Please deposit USDC.")]
+    InsufficientCollateral,
+    #[msg("Insufficient share balance in ledger. Please split or buy shares.")]
+    InsufficientShares,
+    #[msg("The provided price is invalid.")]
+    InvalidPrice,
 }
