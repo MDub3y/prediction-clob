@@ -124,7 +124,7 @@ pub fn handle_merge(ctx: Context<SplitMerge>, amount: u64) -> Result<()> {
             },
             &[seeds],
         ),
-        amount * 100,
+        amount,
     )?;
     Ok(())
 }
