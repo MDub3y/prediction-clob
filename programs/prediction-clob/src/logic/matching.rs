@@ -21,12 +21,14 @@ pub fn execute_match(
     taker_side: OrderSide,
     taker_quantity: u64,
     limit_price: u64,
+    is_market_order: bool,
 ) -> MatchResult {
     let mut remaining = taker_quantity;
     let mut total_quote = 0u64;
     let mut total_base = 0u64;
     let mut total_fee = 0u64;
     let mut makers = Vec::new();
+    let mut actual_last_price = limit_price;
 
     let mut maker_idx = if taker_side == OrderSide::BID {
         ob.ask_head
@@ -37,13 +39,16 @@ pub fn execute_match(
     while maker_idx != SENTINEL && remaining > 0 {
         let (maker_user, maker_price, fill_amt, is_full_fill) = {
             let maker_node = &mut ob.orders[maker_idx as usize];
-            let price_ok = if taker_side == OrderSide::BID {
-                maker_node.price.val <= limit_price
-            } else {
-                maker_node.price.val >= limit_price
-            };
-            if !price_ok {
-                break;
+
+            if !is_market_order {
+                let price_ok = if taker_side == OrderSide::BID {
+                    maker_node.price.val <= limit_price
+                } else {
+                    maker_node.price.val >= limit_price
+                };
+                if !price_ok {
+                    break;
+                }
             }
 
             let available = maker_node.quantity.val - maker_node.filled_quantity.val;
@@ -56,6 +61,8 @@ pub fn execute_match(
                 maker_node.filled_quantity.val == maker_node.quantity.val,
             )
         };
+
+        actual_last_price = maker_price;
 
         // Fee
         let p = maker_price;
@@ -80,6 +87,7 @@ pub fn execute_match(
             quote_delta: (fill_amt * maker_price).saturating_sub(fee),
         });
 
+        // move to the next maker for remaining
         if is_full_fill {
             let next_ptr = ob.orders[maker_idx as usize].next;
             unstitch_and_free(ob, maker_idx, taker_side.opposite());
@@ -90,7 +98,7 @@ pub fn execute_match(
     }
 
     if total_base > 0 {
-        ob.last_traded_price = limit_price;
+        ob.last_traded_price = actual_last_price;
     }
     ob.unclaimed_fees += total_fee;
 
