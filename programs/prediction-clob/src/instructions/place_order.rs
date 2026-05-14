@@ -2,7 +2,6 @@ use crate::logic::*;
 use crate::quantities::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::MintTo;
 use anchor_spl::token::Transfer;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
@@ -45,7 +44,9 @@ pub fn handle_place_order(
     quantity: u64,
     price: u64,
     side: u8,
+    is_market: bool,
 ) -> Result<()> {
+    let user_account = &mut ctx.accounts.user_account;
     let order_side = if side == 0 {
         OrderSide::BID
     } else {
@@ -60,76 +61,55 @@ pub fn handle_place_order(
     let mut ob = target_ob_loader.load_mut()?;
 
     if order_side == OrderSide::BID {
-        let cost = quantity
-            .checked_mul(price)
-            .unwrap()
-            .checked_div(100)
-            .unwrap();
-        token::transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.user_collateral_ata.to_account_info(),
-                    to: ctx.accounts.market_vault.to_account_info(),
-                    authority: ctx.accounts.user.to_account_info(),
-                },
-            ),
-            cost,
-        )?;
+        let total_cost = quantity.checked_mul(price).unwrap() / 100;
+
+        require!(
+            user_account.collateral_balance >= total_cost,
+            ErrorCode::InsufficientCollateral
+        );
+
+        user_account.collateral_balance -= total_cost;
+        user_account.collateral_locked += total_cost;
     } else {
-        let target_ata = if is_order_for_a {
-            ctx.accounts.user_outcome_a_ata.to_account_info()
+        let current_balance = if is_order_for_a {
+            user_account.outcome_a_balance
         } else {
-            ctx.accounts.user_outcome_b_ata.to_account_info()
+            user_account.outcome_b_balance
         };
 
-        token::transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: target_ata,
-                    to: ctx.accounts.market_vault.to_account_info(),
-                    authority: ctx.accounts.user.to_account_info(),
-                },
-            ),
-            quantity,
-        )?;
-    }
+        require!(current_balance >= quantity, ErrorCode::InsufficientShares);
 
-    let match_result = execute_match(&mut ob, order_side, quantity, price);
-
-    if match_result.base_filled > 0 {
-        let market_id_bytes = ctx.accounts.market.market_id.to_le_bytes();
-        let seeds: &[&[u8]] = &[b"market", &market_id_bytes, &[ctx.accounts.market.bump]];
-
-        if order_side == OrderSide::BID {
-            let mint_to_info = if is_order_for_a {
-                ctx.accounts.outcome_a_mint.to_account_info()
-            } else {
-                ctx.accounts.outcome_b_mint.to_account_info()
-            };
-            let ata_to_info = if is_order_for_a {
-                ctx.accounts.user_outcome_a_ata.to_account_info()
-            } else {
-                ctx.accounts.user_outcome_b_ata.to_account_info()
-            };
-
-            token::mint_to(
-                CpiContext::new_with_signer(
-                    ctx.accounts.token_program.to_account_info(),
-                    MintTo {
-                        mint: mint_to_info,
-                        to: ata_to_info,
-                        authority: ctx.accounts.market.to_account_info(),
-                    },
-                    &[seeds],
-                ),
-                match_result.base_filled,
-            )?;
+        if is_order_for_a {
+            user_account.outcome_a_balance -= quantity;
+            user_account.outcome_a_locked += quantity;
+        } else {
+            user_account.outcome_b_balance -= quantity;
+            user_account.outcome_b_locked += quantity;
         }
     }
 
-    if match_result.remaining_quantity > 0 {
+    let match_result = execute_match(&mut ob, order_side, quantity, price, is_market);
+
+    if match_result.base_filled > 0 {
+        if order_side == OrderSide::BID {
+            let filled_cost = match_result.quote_filled / 100;
+            user_account.collateral_locked -= filled_cost;
+            if is_order_for_a {
+                user_account.outcome_a_balance += match_result.base_filled;
+            } else {
+                user_account.outcome_b_balance += match_result.base_filled;
+            }
+        } else {
+            if is_order_for_a {
+                user_account.outcome_a_locked -= match_result.base_filled;
+            } else {
+                user_account.outcome_b_locked -= match_result.base_filled;
+            }
+            user_account.collateral_balance += match_result.quote_filled / 100;
+        }
+    }
+
+    if !is_market && match_result.remaining_quantity > 0 {
         if let Some(idx) = pop_free_node(&mut ob) {
             let node = &mut ob.orders[idx as usize];
             node.user = ctx.accounts.user.key();
@@ -141,6 +121,20 @@ pub fn handle_place_order(
             node.status = OrderStatus::OPEN;
             node.timestamp = ctx.accounts.clock.unix_timestamp;
             insert_sorted(&mut ob, idx, order_side);
+        }
+    } else if is_market && match_result.remaining_quantity > 0 {
+        if order_side == OrderSide::BID {
+            let unused_cost = match_result.remaining_quantity.checked_mul(price).unwrap() / 100;
+            user_account.collateral_locked -= unused_cost;
+            user_account.collateral_balance += unused_cost;
+        } else {
+            if is_order_for_a {
+                user_account.outcome_a_locked -= match_result.remaining_quantity;
+                user_account.outcome_a_balance += match_result.remaining_quantity;
+            } else {
+                user_account.outcome_b_locked -= match_result.remaining_quantity;
+                user_account.outcome_b_balance += match_result.remaining_quantity;
+            }
         }
     }
 
